@@ -149,3 +149,9 @@ variable "dataset_size_alert_percentage" {
   type        = number
   default     = 80
 }
+
+variable "card_type" {
+  description = "Type of the payment card"
+  type        = string
+  default     = "Mastercard"
+}

@@ -1,6 +1,6 @@
 # Data Source - Payment Method
 data "rediscloud_payment_method" "card" {
-  card_type = "Visa"
+  card_type = var.card_type
 }
 
 # Data Source - AWS Regions
