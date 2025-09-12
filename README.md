@@ -65,7 +65,7 @@ You can deploy different environments by simply adjusting variables (e.g., `dev`
 ```bash
 git clone https://github.com/gacerioni/rediscloud-terraform-labs.git
 cd rediscloud-terraform-labs
-git checkout master   # uses tf_pro_workshop as base
+git checkout main   # uses tf_pro_workshop as base
 ```
 
 2. Create a `terraform.tfvars` File (or environment-specific `env/dev.tfvars`, `env/prod.tfvars`):
