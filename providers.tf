@@ -2,11 +2,11 @@ terraform {
   required_providers {
     rediscloud = {
       source = "RedisLabs/rediscloud"
-      version = "2.2.1"
+      version = "2.3.1"
     }
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 4.0"
+      version = "~> 6.13.0"
     }
   }
 }
@@ -27,9 +27,7 @@ provider "rediscloud" {
 
 
 provider "aws" {
-  region = var.vpc_peering_region
-
-  # Use default credentials or provide access keys explicitly
+  region     = local.region_for_env
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }

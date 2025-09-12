@@ -34,7 +34,7 @@ variable "subscription_name" {
 variable "cloud_account_id" {
   description = "Cloud account ID for the AWS provider"
   type        = string
-  default = "6415" # Use the correct value for your account
+  default     = "6415" # Use the correct value for your account
 }
 
 variable "database_name" {
@@ -89,7 +89,7 @@ variable "tags" {
   description = "Custom tags for the database"
   type        = map(string)
   default     = {
-    "market" = "emea"
+    "market" = "brazil"
   }
 }
 
@@ -101,17 +101,15 @@ variable "user_password" {
 }
 
 variable "region" {
-  description = "AWS region for the subscription"
+  description = "AWS region for the subscription (leave empty to use env defaults)"
   type        = string
-  default     = "us-east-1"
+  default     = ""
 }
 
 variable "preferred_availability_zones" {
   description = "Preferred availability zones for the subscription"
   type        = list(string)
-  #default     = ["use-az1", "use-az2", "use-az3"]
-  #default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
-  default = []
+  default     = []
 }
 
 variable "networking_deployment_cidr" {
@@ -138,20 +136,24 @@ variable "consumer_cidr" {
   default     = "10.0.0.0/24"
 }
 
-variable "vpc_peering_region" {
-  description = "The AWS region where the subscription and peering are created"
-  type        = string
-  default     = "us-east-1"
-}
-
 variable "dataset_size_alert_percentage" {
   description = "Alert threshold for dataset size in percentage"
   type        = number
   default     = 80
 }
 
-variable "card_type" {
-  description = "Type of the payment card"
+variable "environment" {
+  description = "Deployment environment"
   type        = string
-  default     = "Mastercard"
+  default     = "dev"
+  validation {
+    condition     = contains(["dev", "prod"], var.environment)
+    error_message = "environment must be one of: dev, prod."
+  }
+}
+
+variable "enable_vpc_peering" {
+  description = "Enable AWS VPC peering resources (disable while using PrivateLink v2)"
+  type        = bool
+  default     = false
 }

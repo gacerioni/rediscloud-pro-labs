@@ -1,17 +1,19 @@
-redis_global_api_key = "lamar-gabsthecreator-1337"
-redis_global_secret_key = "lamar-gabsthecreator-1337-r0x"
-subscription_name = "pro-sub-workshop"
-database_name = "gabs-db"
-networking_deployment_cidr = "10.123.42.0/24"
-cloud_account_id = "1"
-dataset_size_in_gb = 1
-throughput_measurement_value = 1000
-replication = false
-enable_tls = false
-user_password = "Secret).42"
+redis_global_api_key        = "lamar-gabsthecreator-1337"
+redis_global_secret_key     = "lamar-gabsthecreator-1337-r0x"
+subscription_name           = "pro-sub-workshop"
+database_name               = "gabs-db"
+networking_deployment_cidr  = "10.123.42.0/24"
+cloud_account_id            = "1"
+dataset_size_in_gb          = 1
+throughput_measurement_value= 1000
+replication                 = false
+enable_tls                  = false
+user_password               = "Secret).42"
 dataset_size_alert_percentage = 95
 tags = {
   environment = "dev"
   project     = "my-project"
   owner       = "gabs-the-nerd"
 }
+# optional, but recommended for clarity:
+# environment = "dev"

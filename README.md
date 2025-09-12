@@ -4,12 +4,13 @@ This repository contains Terraform configurations for provisioning **a Redis Clo
 
 **The configuration is designed to:**
 
-- Create a new Redis Cloud PRO subscription.
+- Create a new Redis Cloud PRO subscription (Marketplace-based billing).
 - Add a Redis Cloud PRO database within the subscription.
 - Disable the default user to enhance security.
 - Optionally enforce TLS connections based on configuration.
 - Create a specific user with RBAC ACL for the database.
 - Apply tags for metadata purposes.
+- Provide optional AWS VPC peering integration (disabled by default, ready for future PrivateLink v2).
 
 ---
 
@@ -17,20 +18,24 @@ This repository contains Terraform configurations for provisioning **a Redis Clo
 
 This Terraform setup simplifies the creation and management of Redis Cloud PRO subscriptions and databases. It includes essential security configurations, API integration, and support for custom database settings, user access, and security features such as TLS and RBAC.
 
+You can deploy different environments by simply adjusting variables (e.g., `dev` in `us-east-1` vs. `prod` in `sa-east-1`). Region mapping is handled automatically unless overridden.
+
 ## Prerequisites
 
-- Terraform (or tofu) installed on your machine.
+- Terraform (or [OpenTofu](https://opentofu.org)) installed on your machine.
 - Access to Redis Cloud API credentials.
-- Access to AWS API credentials (`aws_access_key` and `aws_secret_key` will suffice).
+- Optional: AWS API credentials (`aws_access_key` and `aws_secret_key`) — only needed if enabling VPC peering.
 
-## Variables (in constant evolution)
+## Variables
 
-**The following input variables must be configured (_customizable to your needs_):**
+**Key input variables (_customizable to your needs_):**
 
 - `redis_global_api_key`: Your Redis Cloud API key.
 - `redis_global_secret_key`: Your Redis Cloud API secret key.
 - `subscription_name`: The name of the Redis Cloud subscription to create.
-- `cloud_account_id`: The ID of your cloud provider account linked to Redis Cloud. Optional, naturally.
+- `cloud_account_id`: The ID of your cloud provider account linked to Redis Cloud. Use `1` for Redis-managed accounts.
+- `environment`: Deployment environment (`dev` or `prod`). Controls default region mapping.
+- `region`: Optional manual region override (if empty, environment mapping applies).
 - `database_name`: The name of the new Redis Cloud database to be created.
 - `dataset_size_in_gb`: The dataset size limit in GB for the database.
 - `throughput_measurement_value`: The desired throughput in operations per second.
@@ -38,42 +43,44 @@ This Terraform setup simplifies the creation and management of Redis Cloud PRO s
 - `enable_tls`: Boolean to enable or disable TLS for database connections.
 - `user_password`: The password for the specific user created for RBAC ACL.
 - `tags`: A map of tags to associate with the subscription and database for metadata purposes.
+- `enable_vpc_peering`: Boolean to enable AWS VPC peering resources (default: false).
 
 ---
 
-
 ## Key Features Configured
 
-- **Disabling the Default User:** Enhances security by removing the default access credentials.
+- **Marketplace Billing:** No need for payment method IDs, just set `payment_method = "marketplace"`.
+- **Environment-Aware Deployments:** `dev → us-east-1`, `prod → sa-east-1`, or override with `region` variable.
+- **Disabling the Default User:** Enhances security by removing default access credentials.
 - **TLS Enforcement:** Optionally enforce TLS for secure connections to the database.
-- **RBAC and ACL Configuration:** Creates a specific user and role with defined ACLs for controlled access to the database.
-- **Tagging:** Allows you to apply custom tags for better resource organization and metadata management.
+- **RBAC and ACL Configuration:** Creates a specific user and role with defined ACLs for controlled access.
+- **Tagging:** Apply custom tags for better resource organization and metadata management.
+- **Optional VPC Peering:** Ready to be enabled if needed; by default disabled until PrivateLink v2 support arrives.
 
 ## Usage
 
 **To use this Terraform configuration, follow these steps:**
 
-1.	Clone the Repository and go to our current long-lived branch (I will fix this soon - I hate long lived branches lol):
+1. Clone the Repository:
 ```bash
 git clone https://github.com/gacerioni/rediscloud-terraform-labs.git
 cd rediscloud-terraform-labs
-git checkout tf_pro_workshop
+git checkout master   # uses tf_pro_workshop as base
 ```
 
-2.	Create a `terraform.tfvars` File:
+2. Create a `terraform.tfvars` File (or environment-specific `env/dev.tfvars`, `env/prod.tfvars`):
 ```hcl
 redis_global_api_key        = "your-api-key"
 redis_global_secret_key     = "your-secret-key"
-aws_access_key              = "your_aws_access_key"
-aws_secret_key              = "your_aws_secret_key"
 subscription_name           = "your-subscription-name"
-cloud_account_id            = "6415"
+cloud_account_id            = "1"
 database_name               = "your-database-name"
-dataset_size_in_gb          = 1
+dataset_size_in_gb          = 2
 throughput_measurement_value= 1000
-replication                 = true
+replication                 = false
 enable_tls                  = true
 user_password               = "Secret).42"
+environment                 = "dev"
 tags = {
   environment = "dev"
   project     = "my-project"
@@ -81,37 +88,44 @@ tags = {
 }
 ```
 
-3.	Initialize Terraform and do the magic:
+3. Initialize Terraform and deploy:
 ```bash
 terraform init
-terraform plan
-terraform apply
-<...>
-terraform destroy
+terraform plan -var-file=env/dev.tfvars   # for dev
+terraform apply -var-file=env/dev.tfvars
+
+terraform plan -var-file=env/prod.tfvars  # for prod
+terraform apply -var-file=env/prod.tfvars
+
+terraform destroy -var-file=env/dev.tfvars
 ```
 
-**⚠️ Important: there are some optional complexity that you can avoid.**
-- Replace your-api-key and your-secret-key with your Redis Cloud API credentials.
-- **AWS API** is only needed because I demo a VPC Peering, and accepting the Peering Request is a required step for our TF Provider logic.
-  - If you don't want this, just comment out lines [#L97](https://github.com/gacerioni/rediscloud-terraform-labs/blob/tf_pro_workshop/main.tf#L97) - #L109 (the tail of the `main.tf` file)
-- Use a meaningful subscription_name and database_name relevant to your project.
-- Set `cloud_account_id = 1` to use Redis Managed AWS Acc and VPC. Use the [https://api.redislabs.com/v1/cloud-accounts](https://api.redislabs.com/v1/swagger-ui/index.html) if you have your own *Cloud Account* in Redis Cloud.
+---
 
+## Security Notes
 
+- **Sensitive Variables:** Ensure that sensitive information like `redis_global_api_key`, `redis_global_secret_key`, and `user_password` are stored securely. Do not commit them to version control.
+- **State File Security:** The Terraform state file (`terraform.tfstate`) may contain sensitive information. Use secure backends (e.g., Terraform Cloud, S3 with encryption) when possible.
 
-## Security Note
-
-- **Sensitive Variables:** Ensure that sensitive information like redis_global_api_key, redis_global_secret_key, and user_password are stored securely. Do not commit these to version control.
-- **State File Security:** Be cautious with the Terraform state file (terraform.tfstate), as it may contain sensitive information.
-
+---
 
 ## Contributing
 
-Contributions to this project are welcome. Please ensure to follow the standard Git workflow and submit pull requests for any changes.
+Contributions to this project are welcome. Please follow GitHub Flow (branch → PR → review → merge).
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+---
 
-redis-cli --tls -h redis-19868.c35329.us-east-1-mz.ec2.cloud.rlrcp.com -p 19868 --user gabs-db-user --pass "Secret).42"
+## Quick Connect (redis-cli)
+
+Once deployed, you can connect to your Redis instance like this:
+
+```bash
+redis-cli --tls -h <private_or_public_endpoint> -p <port> \
+  --user <database-user> --pass "<user_password>"
+```
+
+Replace placeholders with the output values after `terraform apply`.
