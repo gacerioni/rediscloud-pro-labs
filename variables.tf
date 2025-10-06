@@ -13,14 +13,14 @@ variable "redis_global_secret_key" {
 }
 
 variable "aws_access_key" {
-  description = "AWS Access Key for managing VPC peering connections"
+  description = "AWS Access Key (optional; only needed if you also manage AWS-side resources here)"
   type        = string
   sensitive   = true
   default     = null
 }
 
 variable "aws_secret_key" {
-  description = "AWS Secret Key for managing VPC peering connections"
+  description = "AWS Secret Key (optional; only needed if you also manage AWS-side resources here)"
   type        = string
   sensitive   = true
   default     = null
@@ -89,7 +89,7 @@ variable "tags" {
   description = "Custom tags for the database"
   type        = map(string)
   default     = {
-    "market" = "brazil"
+    market = "brazil"
   }
 }
 
@@ -118,24 +118,6 @@ variable "networking_deployment_cidr" {
   default     = "10.123.42.0/24"
 }
 
-variable "aws_account_id" {
-  description = "AWS Account ID where the VPC to be peered lives"
-  type        = string
-  default     = "735486936198"
-}
-
-variable "aws_vpc_id" {
-  description = "The AWS VPC ID to be peered with Redis Cloud"
-  type        = string
-  default     = "vpc-0ae08c2573e50aa42"
-}
-
-variable "consumer_cidr" {
-  description = "The CIDR range of the VPC to be peered"
-  type        = string
-  default     = "10.0.0.0/24"
-}
-
 variable "dataset_size_alert_percentage" {
   description = "Alert threshold for dataset size in percentage"
   type        = number
@@ -152,8 +134,63 @@ variable "environment" {
   }
 }
 
-variable "enable_vpc_peering" {
-  description = "Enable AWS VPC peering resources (disable while using PrivateLink v2)"
-  type        = bool
-  default     = false
+# --- PrivateLink variables (new) ---
+variable "private_link_share_name" {
+  description = "Share name for Redis Cloud PrivateLink"
+  type        = string
 }
+
+variable "private_link_principals" {
+  description = "Principals to allow on the PrivateLink"
+  type = list(object({
+    principal       = string
+    principal_type  = string # one of: aws_account, organization, organization_unit, iam_role, iam_user, service_principal
+    principal_alias = optional(string)
+  }))
+  default = []
+
+  validation {
+    condition = alltrue([
+      for p in var.private_link_principals :
+      contains(
+        ["aws_account", "organization", "organization_unit", "iam_role", "iam_user", "service_principal"],
+        p.principal_type
+      )
+    ])
+    error_message = "Each principal_type must be one of: aws_account, organization, organization_unit, iam_role, iam_user, service_principal."
+  }
+}
+
+
+# Choose how to pay for the subscription
+# Allowed: "marketplace" or "credit-card"
+variable "billing_mode" {
+  description = "Subscription billing method"
+  type        = string
+  default     = "marketplace"
+  validation {
+    condition     = contains(["marketplace", "credit-card"], var.billing_mode)
+    error_message = "billing_mode must be one of: marketplace, credit-card."
+  }
+}
+
+# For credit-card mode, how to pick the payment method
+# Option A: by card_type (e.g., Visa, Mastercard)
+variable "card_type" {
+  description = "Card type to select when billing_mode = credit-card (e.g., Visa, Mastercard)"
+  type        = string
+  default     = "Mastercard"
+}
+
+# Option B (optional): narrow down to last4 if you have multiple cards of the same type
+variable "card_last4" {
+  description = "Optional last 4 digits of the desired credit card (used only when billing_mode = credit-card)"
+  type        = string
+  default     = ""
+}
+
+# --- Removed peering flags/IDs (replaced by PrivateLink) ---
+# variable "aws_account_id"  (no longer needed)
+# variable "aws_vpc_id"      (no longer needed)
+# variable "consumer_cidr"   (no longer needed)
+# variable "enable_vpc_peering" (no longer needed)

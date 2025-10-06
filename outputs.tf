@@ -64,12 +64,27 @@ output "rediscloud_database_password" {
   sensitive   = true
 }
 
-output "rediscloud_peering_status" {
-  description = "Peering status (empty when peering disabled)"
-  value       = try(rediscloud_subscription_peering.aws_peering[0].status, null)
+# --- PrivateLink outputs ---
+output "rediscloud_privatelink_share_arn" {
+  description = "Share ARN of the Redis Cloud PrivateLink"
+  value       = rediscloud_private_link.aws_privatelink.share_arn
 }
 
-output "aws_vpc_peering_id" {
-  description = "AWS VPC peering ID (empty when peering disabled)"
-  value       = try(rediscloud_subscription_peering.aws_peering[0].aws_peering_id, null)
+output "rediscloud_privatelink_resource_configuration_arn" {
+  description = "Resource configuration ARN for the PrivateLink"
+  value       = rediscloud_private_link.aws_privatelink.resource_configuration_arn
 }
+
+output "rediscloud_privatelink_connections" {
+  description = "List of PrivateLink connections"
+  value       = rediscloud_private_link.aws_privatelink.connections
+}
+
+output "rediscloud_privatelink_databases" {
+  description = "Databases and their PrivateLink endpoints (resource_link_endpoint)"
+  value       = rediscloud_private_link.aws_privatelink.databases
+}
+
+# --- Removed: peering outputs ---
+# rediscloud_peering_status
+# aws_vpc_peering_id

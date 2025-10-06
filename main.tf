@@ -2,24 +2,50 @@
 # Env → Region mapping
 ############################
 locals {
+  # Map environment to default AWS Region
   env_region_map = {
     dev  = "us-east-1"
     prod = "sa-east-1"
   }
-  # If var.region is set, use it; else use env mapping
+
+  # If var.region is set, use it; else use env default
   region_for_env = var.region != "" ? var.region : local.env_region_map[var.environment]
 }
 
 ############################
-# Redis Cloud PRO Subscription (Marketplace billing)
+# Payment method lookup (only when using credit-card)
+# - We set count = 1 only if billing_mode == "credit-card".
+# - For marketplace, this data source is skipped entirely.
+############################
+data "rediscloud_payment_method" "card" {
+  count     = var.billing_mode == "credit-card" ? 1 : 0
+  card_type = var.card_type
+}
+
+# Resolve the payment method id only in credit-card mode.
+# If you need deterministic selection among multiple cards of the same type,
+# you can extend this to choose by last4 or a name, but most accounts only
+# need card_type.
+locals {
+  selected_payment_method_id = var.billing_mode == "credit-card" ? data.rediscloud_payment_method.card[0].id : null
+}
+
+############################
+# Redis Cloud PRO Subscription
+# - Billing is conditional:
+#     * marketplace:  payment_method="marketplace" (no payment_method_id)
+#     * credit-card:  payment_method="credit-card" + payment_method_id
 ############################
 resource "rediscloud_subscription" "pro_subscription" {
   name           = var.subscription_name
-  payment_method = "marketplace"     # Marketplace billing (no payment_method_id)
-  # IF YOU WANT TO TRY THE CREDIT CARD BILLING, UNCOMMENT THE NEXT LINE AND COMMENT THE PREVIOUS ONE
-  #payment_method = "credit-card"    # Credit Card billing (requires payment_method_id
-  #payment_method_id = "43521"
   memory_storage = "ram"
+
+  # Billing mode comes from variables:
+  #   - "marketplace" (requires your account to be marketplace-enabled)
+  #   - "credit-card" (requires a valid card on the account)
+  payment_method    = var.billing_mode
+  # When marketplace is used, this remains null (Terraform omits it).
+  payment_method_id = var.billing_mode == "credit-card" ? local.selected_payment_method_id : null
 
   cloud_provider {
     provider         = "AWS"
@@ -46,15 +72,25 @@ resource "rediscloud_subscription" "pro_subscription" {
   maintenance_windows {
     mode = "manual"
     window {
-      start_hour         = 2
-      duration_in_hours  = 4
-      days               = ["Sunday"]
+      start_hour        = 2
+      duration_in_hours = 4
+      days              = ["Sunday"]
+    }
+  }
+
+  # Helpful guardrail:
+  # If user chooses credit-card but we couldn’t resolve a method, fail early.
+  lifecycle {
+    precondition {
+      condition     = var.billing_mode != "credit-card" || local.selected_payment_method_id != null
+      error_message = "billing_mode is 'credit-card' but no payment method was found for card_type='${var.card_type}'. Check your account payment methods or adjust variables."
     }
   }
 }
 
 ############################
 # Database
+# - redis_version must be set here (subscription-level redis_version is deprecated).
 ############################
 resource "rediscloud_subscription_database" "pro_redis_database" {
   subscription_id               = rediscloud_subscription.pro_subscription.id
@@ -69,6 +105,7 @@ resource "rediscloud_subscription_database" "pro_redis_database" {
   enable_tls                    = var.enable_tls
   tags                          = var.tags
 
+  # Convert your simple modules list into the required object list
   modules = [
     for module in var.modules : { name = module }
   ]
@@ -105,19 +142,21 @@ resource "rediscloud_acl_user" "acl_user" {
 }
 
 ############################
-# (Optional) AWS VPC Peering (disabled by default)
+# PrivateLink (replaces VPC peering)
+# - Creates the PrivateLink share and allowlists principals (AWS accounts, orgs, etc).
+# - Your AWS consumer VPC will still need to create an Interface VPC Endpoint to consume it.
 ############################
-resource "rediscloud_subscription_peering" "aws_peering" {
-  count           = var.enable_vpc_peering ? 1 : 0
+resource "rediscloud_private_link" "aws_privatelink" {
   subscription_id = rediscloud_subscription.pro_subscription.id
-  region          = local.region_for_env
-  aws_account_id  = var.aws_account_id
-  vpc_id          = var.aws_vpc_id
-  vpc_cidr        = var.consumer_cidr
-}
+  share_name      = var.private_link_share_name
 
-resource "aws_vpc_peering_connection_accepter" "aws_peering_accepter" {
-  count                     = var.enable_vpc_peering ? 1 : 0
-  vpc_peering_connection_id = rediscloud_subscription_peering.aws_peering[0].aws_peering_id
-  auto_accept               = true
+  # Add one 'principal' block per allowed principal using a dynamic block over the input list.
+  dynamic "principal" {
+    for_each = var.private_link_principals
+    content {
+      principal       = principal.value.principal
+      principal_type  = principal.value.principal_type  # aws_account | organization | organization_unit | iam_role | iam_user | service_principal
+      principal_alias = try(principal.value.principal_alias, null)
+    }
+  }
 }

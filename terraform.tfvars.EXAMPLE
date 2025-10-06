@@ -17,3 +17,7 @@ tags = {
 }
 # optional, but recommended for clarity:
 # environment = "dev"
+
+# default     = "marketplace"
+billing_mode  = "credit-card"
+card_type     = "Mastercard" 
