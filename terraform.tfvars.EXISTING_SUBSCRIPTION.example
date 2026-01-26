@@ -1,0 +1,39 @@
+# Example configuration for adding a database to an EXISTING subscription
+
+# Redis Cloud API credentials
+redis_global_api_key        = "your-api-key-here"
+redis_global_secret_key     = "your-secret-key-here"
+
+# Subscription creation mode
+create_subscription         = false  # Use existing subscription
+existing_subscription_id    = "12345678"  # Your existing subscription ID
+
+# Database settings
+database_name               = "my-new-redis-db"
+redis_version               = "8.2"
+dataset_size_in_gb          = 1
+throughput_measurement_value= 1000
+replication                 = false
+enable_tls                  = false
+user_password               = "YourSecurePassword123!"
+dataset_size_alert_percentage = 95
+
+# Environment (used for region mapping if needed)
+environment                 = "dev"
+
+# Tags
+tags = {
+  environment = "dev"
+  project     = "my-project"
+  owner       = "your-name"
+}
+
+# Note: The following variables are NOT used when create_subscription = false:
+# - subscription_name
+# - cloud_account_id
+# - networking_deployment_cidr
+# - billing_mode
+# - card_type
+# - private_link_share_name
+# - private_link_principals
+

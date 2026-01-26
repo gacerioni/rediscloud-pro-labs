@@ -1,11 +1,11 @@
 output "rediscloud_subscription_id" {
-  description = "The ID of the Redis Cloud subscription"
-  value       = rediscloud_subscription.pro_subscription.id
+  description = "The ID of the Redis Cloud subscription (created or existing)"
+  value       = local.subscription_id
 }
 
 output "rediscloud_subscription_name" {
-  description = "The name of the Redis Cloud subscription"
-  value       = rediscloud_subscription.pro_subscription.name
+  description = "The name of the Redis Cloud subscription (only available when created by this config)"
+  value       = var.create_subscription ? rediscloud_subscription.pro_subscription[0].name : null
 }
 
 output "rediscloud_database_id" {
@@ -64,25 +64,25 @@ output "rediscloud_database_password" {
   sensitive   = true
 }
 
-# --- PrivateLink outputs ---
+# --- PrivateLink outputs (only when subscription is created) ---
 output "rediscloud_privatelink_share_arn" {
-  description = "Share ARN of the Redis Cloud PrivateLink"
-  value       = rediscloud_private_link.aws_privatelink.share_arn
+  description = "Share ARN of the Redis Cloud PrivateLink (only available when subscription is created)"
+  value       = var.create_subscription ? rediscloud_private_link.aws_privatelink[0].share_arn : null
 }
 
 output "rediscloud_privatelink_resource_configuration_arn" {
-  description = "Resource configuration ARN for the PrivateLink"
-  value       = rediscloud_private_link.aws_privatelink.resource_configuration_arn
+  description = "Resource configuration ARN for the PrivateLink (only available when subscription is created)"
+  value       = var.create_subscription ? rediscloud_private_link.aws_privatelink[0].resource_configuration_arn : null
 }
 
 output "rediscloud_privatelink_connections" {
-  description = "List of PrivateLink connections"
-  value       = rediscloud_private_link.aws_privatelink.connections
+  description = "List of PrivateLink connections (only available when subscription is created)"
+  value       = var.create_subscription ? rediscloud_private_link.aws_privatelink[0].connections : null
 }
 
 output "rediscloud_privatelink_databases" {
-  description = "Databases and their PrivateLink endpoints (resource_link_endpoint)"
-  value       = rediscloud_private_link.aws_privatelink.databases
+  description = "Databases and their PrivateLink endpoints (only available when subscription is created)"
+  value       = var.create_subscription ? rediscloud_private_link.aws_privatelink[0].databases : null
 }
 
 # --- Removed: peering outputs ---

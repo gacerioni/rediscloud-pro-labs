@@ -10,24 +10,24 @@ locals {
 
   # If var.region is set, use it; else use env default
   region_for_env = var.region != "" ? var.region : local.env_region_map[var.environment]
+
+  # Determine which subscription ID to use
+  subscription_id = var.create_subscription ? rediscloud_subscription.pro_subscription[0].id : var.existing_subscription_id
 }
 
 ############################
-# Payment method lookup (only when using credit-card)
-# - We set count = 1 only if billing_mode == "credit-card".
-# - For marketplace, this data source is skipped entirely.
+# Payment method lookup (only when using credit-card AND creating new subscription)
+# - We set count = 1 only if billing_mode == "credit-card" and create_subscription == true
+# - For marketplace or existing subscription, this data source is skipped entirely.
 ############################
 data "rediscloud_payment_method" "card" {
-  count     = var.billing_mode == "credit-card" ? 1 : 0
+  count     = var.create_subscription && var.billing_mode == "credit-card" ? 1 : 0
   card_type = var.card_type
 }
 
-# Resolve the payment method id only in credit-card mode.
-# If you need deterministic selection among multiple cards of the same type,
-# you can extend this to choose by last4 or a name, but most accounts only
-# need card_type.
+# Resolve the payment method id only in credit-card mode when creating subscription
 locals {
-  selected_payment_method_id = var.billing_mode == "credit-card" ? data.rediscloud_payment_method.card[0].id : null
+  selected_payment_method_id = var.create_subscription && var.billing_mode == "credit-card" ? data.rediscloud_payment_method.card[0].id : null
 }
 
 ############################
@@ -37,14 +37,12 @@ locals {
 #     * credit-card:  payment_method="credit-card" + payment_method_id
 ############################
 resource "rediscloud_subscription" "pro_subscription" {
+  count = var.create_subscription ? 1 : 0
+
   name           = var.subscription_name
   memory_storage = "ram"
 
-  # Billing mode comes from variables:
-  #   - "marketplace" (requires your account to be marketplace-enabled)
-  #   - "credit-card" (requires a valid card on the account)
   payment_method    = var.billing_mode
-  # When marketplace is used, this remains null (Terraform omits it).
   payment_method_id = var.billing_mode == "credit-card" ? local.selected_payment_method_id : null
 
   cloud_provider {
@@ -60,13 +58,14 @@ resource "rediscloud_subscription" "pro_subscription" {
   }
 
   # Initial creation plan (hardware profile)
+  # Note: modules are NOT specified here for Redis 8+ compatibility
+  # Modules are specified at the database level instead
   creation_plan {
     dataset_size_in_gb           = var.dataset_size_in_gb
     quantity                     = 1
     replication                  = var.replication
     throughput_measurement_by    = "operations-per-second"
     throughput_measurement_value = var.throughput_measurement_value
-    modules                      = var.modules
   }
 
   maintenance_windows {
@@ -82,7 +81,7 @@ resource "rediscloud_subscription" "pro_subscription" {
   # If user chooses credit-card but we couldn’t resolve a method, fail early.
   lifecycle {
     precondition {
-      condition     = var.billing_mode != "credit-card" || local.selected_payment_method_id != null
+      condition     = !var.create_subscription || var.billing_mode != "credit-card" || local.selected_payment_method_id != null
       error_message = "billing_mode is 'credit-card' but no payment method was found for card_type='${var.card_type}'. Check your account payment methods or adjust variables."
     }
   }
@@ -93,9 +92,9 @@ resource "rediscloud_subscription" "pro_subscription" {
 # - redis_version must be set here (subscription-level redis_version is deprecated).
 ############################
 resource "rediscloud_subscription_database" "pro_redis_database" {
-  subscription_id               = rediscloud_subscription.pro_subscription.id
+  subscription_id               = local.subscription_id
   name                          = var.database_name
-  redis_version                 = "7.4"
+  redis_version                 = var.redis_version
   dataset_size_in_gb            = var.dataset_size_in_gb
   data_persistence              = var.data_persistence
   throughput_measurement_by     = "operations-per-second"
@@ -105,10 +104,7 @@ resource "rediscloud_subscription_database" "pro_redis_database" {
   enable_tls                    = var.enable_tls
   tags                          = var.tags
 
-  # Convert your simple modules list into the required object list
-  modules = [
-    for module in var.modules : { name = module }
-  ]
+  # Redis 8+ includes all modules by default - do not specify modules
 
   alert {
     name  = "dataset-size"
@@ -125,7 +121,7 @@ resource "rediscloud_acl_role" "acl_role" {
   rule {
     name = var.acl_rule_name
     database {
-      subscription = rediscloud_subscription.pro_subscription.id
+      subscription = local.subscription_id
       database     = rediscloud_subscription_database.pro_redis_database.db_id
     }
   }
@@ -145,9 +141,12 @@ resource "rediscloud_acl_user" "acl_user" {
 # PrivateLink (replaces VPC peering)
 # - Creates the PrivateLink share and allowlists principals (AWS accounts, orgs, etc).
 # - Your AWS consumer VPC will still need to create an Interface VPC Endpoint to consume it.
+# - Only created when creating a new subscription (PrivateLink is subscription-level)
 ############################
 resource "rediscloud_private_link" "aws_privatelink" {
-  subscription_id = rediscloud_subscription.pro_subscription.id
+  count = var.create_subscription ? 1 : 0
+
+  subscription_id = local.subscription_id
   share_name      = var.private_link_share_name
 
   # Add one 'principal' block per allowed principal using a dynamic block over the input list.

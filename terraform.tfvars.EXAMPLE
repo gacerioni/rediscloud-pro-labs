@@ -1,14 +1,18 @@
-redis_global_api_key        = "lamar-gabsthecreator-1337"
-redis_global_secret_key     = "lamar-gabsthecreator-1337-r0x"
+# Mode: Create new subscription with database
+create_subscription         = true
+
+redis_global_api_key        = "your-api-key-here"
+redis_global_secret_key     = "your-secret-key-here"
 subscription_name           = "pro-sub-workshop"
-database_name               = "gabs-db"
+database_name               = "my-redis-db"
 networking_deployment_cidr  = "10.123.42.0/24"
 cloud_account_id            = "1"
+redis_version               = "8.2"  # Redis 8+ includes all modules by default
 dataset_size_in_gb          = 1
 throughput_measurement_value= 1000
 replication                 = false
 enable_tls                  = false
-user_password               = "Secret).42"
+user_password               = "YourSecurePassword123!"
 dataset_size_alert_percentage = 95
 tags = {
   environment = "dev"
@@ -20,4 +24,14 @@ tags = {
 
 # default     = "marketplace"
 billing_mode  = "credit-card"
-card_type     = "Mastercard" 
+card_type     = "Mastercard"
+
+# PrivateLink configuration
+private_link_share_name = "my-redis-privatelink"
+private_link_principals = [
+  {
+    principal       = "123456789012"  # Your AWS account ID
+    principal_type  = "aws_account"
+    principal_alias = "dev-account"
+  }
+]

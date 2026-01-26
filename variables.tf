@@ -26,9 +26,22 @@ variable "aws_secret_key" {
   default     = null
 }
 
-variable "subscription_name" {
-  description = "The name of the RedisCloud subscription"
+variable "create_subscription" {
+  description = "Whether to create a new subscription (true) or use an existing one (false)"
+  type        = bool
+  default     = true
+}
+
+variable "existing_subscription_id" {
+  description = "ID of existing subscription (required when create_subscription = false)"
   type        = string
+  default     = ""
+}
+
+variable "subscription_name" {
+  description = "The name of the RedisCloud subscription (only used when create_subscription = true)"
+  type        = string
+  default     = ""
 }
 
 variable "cloud_account_id" {
@@ -61,10 +74,10 @@ variable "throughput_measurement_value" {
   default     = 5000
 }
 
-variable "modules" {
-  description = "List of Redis modules to enable"
-  type        = list(string)
-  default     = ["RedisJSON", "RediSearch", "RedisBloom", "RedisTimeSeries"]
+variable "redis_version" {
+  description = "Redis version for the database. Redis 8+ includes all modules by default."
+  type        = string
+  default     = "8.2"
 }
 
 variable "replication" {
